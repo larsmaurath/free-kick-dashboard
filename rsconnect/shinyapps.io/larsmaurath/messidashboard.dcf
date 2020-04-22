@@ -1,0 +1,10 @@
+name: messidashboard
+title:
+username:
+account: larsmaurath
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2142876
+bundleId: 3035025
+url: https://larsmaurath.shinyapps.io/messidashboard/
+when: 1587314057.55373
