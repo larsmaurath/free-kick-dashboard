@@ -14,21 +14,24 @@ The four panels are linked via the [crosstalk](https://rstudio.github.io/crossta
 ### See how well Messi performs from free kicks in a certain region
 
 Selecting a region in the top left plot shows where these free kicks ended up in the goal impact chart.
+The table in the bottom left is filtered for these attempts and the bottom right shows a quick summary of their outcome, including an assessment on whether Messi has outperformed expectations in this region.
 
 ![](data/location.gif)
 
 ### Find all free kicks that ended up in the top left corner
 
+Selecting a region in the top right plot restricts the analysis to all free kicks that were placed in this region of the goal.
+
 ![](data/goal_mouth.gif)
 
 ### Filter for all free kicks against a certain goalkeeper
 
-The table on the bottom left can be filter. Once rows are highlighted this flows thought to the other panels.
+The table on the bottom left can be filtered. Once rows are highlighted this flows thought to the other panels.
 
 ![](data/keeper.gif)
 
 ### Analyze the freeze frame for a single free kick
 
-If a single free kick is selected we show a freeze frame instead of a summary in the bottom right. It shows the position of all players when the ball was struck.
+If a single free kick is selected the app shows a freeze frame instead of a summary in the bottom right. It shows the position of all players for the moment the ball was struck.
 
 ![](data/freeze_frame.gif)
