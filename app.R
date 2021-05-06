@@ -1,43 +1,62 @@
 library(shiny)
 library(shinydashboard)
 library(tidyverse)
-library(dbplyr)
 library(crosstalk)
 library(plotly)
 library(DT)
+library(StatsBombR)
 
+# This imports some helper functions to plot soccer pitches
 source("pitch_plots.R")
 
-con <- DBI::dbConnect(RSQLite::SQLite(), dbname = "data/free_kicks_messi.sqlite")
+competitions <- FreeCompetitions() %>%
+    filter(competition_name == "La Liga")
 
-freekicks <- tbl(con, "free_kicks") %>%
-    collect() %>%
-    mutate(Name = "Lionel Messi", shot.statsbomb_xg = round(shot.statsbomb_xg, 2)) %>%
-    mutate(shot.outcome.name = if_else(shot.outcome.name == "Post", "Off T", shot.outcome.name)) %>%
-    mutate(shot.outcome.name = if_else(shot.outcome.name == "Saved Off Target", "Saved", shot.outcome.name)) %>%
-    mutate(shot.outcome.name = if_else(shot.outcome.name == "Saved to Post", "Saved", shot.outcome.name)) %>%
-    select(Name = Name,
-           Type = shot.type.name,
-           Foot = shot.body_part.name,
-           Outcome = shot.outcome.name,
-           xG = shot.statsbomb_xg,
-           Opponent = opponent,
-           Goalkeeper = goalkeeper,
-           Season = season.season_name,
-           Date = match_date,
-           Minute = minute,
-           Second = second,
-           id = id,
-           player.id = player.id,
-           match_id = match_id,
-           competition_id = competition_id,
-           location_x = location_x,
-           location_y = location_y,
-           shot_end_x = shot_end_x,
-           shot_end_y = shot_end_y,
-           shot_end_z = shot_end_z)
+matches <- FreeMatches(competitions)
 
-DBI::dbDisconnect(con)
+freekick_list <- list()
+
+# Because the StatsBomb API is relatively slow I am only loading three matches
+# The hosted shiny version works off a local sqlite file to not repeatedly hit the API.
+
+for(i in c(1:3)){
+
+    events <- get.matchFree(matches[i,]) %>%
+        allclean() %>%
+        filter(shot.type.name == "Free Kick") %>%
+        mutate(Name = "Lionel Messi", 
+               shot.statsbomb_xg = round(shot.statsbomb_xg, 2)) %>%
+        mutate(shot.outcome.name = if_else(shot.outcome.name == "Post", "Off T", shot.outcome.name)) %>%
+        mutate(shot.outcome.name = if_else(shot.outcome.name == "Saved Off Target", "Saved", shot.outcome.name)) %>%
+        mutate(shot.outcome.name = if_else(shot.outcome.name == "Saved to Post", "Saved", shot.outcome.name)) %>%
+        left_join(matches, by = "match_id") %>%
+        mutate(opponent = if_else(home_team.home_team_name == "Barcelona", away_team.away_team_name, home_team.home_team_name)) %>%
+        select(Name = Name,
+               Type = shot.type.name,
+               Foot = shot.body_part.name,
+               Outcome = shot.outcome.name,
+               xG = shot.statsbomb_xg,
+               Opponent = opponent,
+               Goalkeeper = player.name.GK,
+               Season = season.season_name,
+               Date = match_date,
+               Minute = minute,
+               Second = second,
+               id = id,
+               player.id = player.id,
+               match_id = match_id,
+               competition_id = competition_id,
+               location_x = location.x,
+               location_y = location.y,
+               shot_end_x = shot.end_location.x,
+               shot_end_y = shot.end_location.y,
+               shot_end_z = shot.end_location.z,
+               freeze_frame = shot.freeze_frame)
+
+    freekick_list[[i]] <- events
+}
+
+freekicks <- bind_rows(freekick_list)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -111,21 +130,19 @@ server <- function(input, output) {
         if(dim(df)[[1]] == 1){
             
             id_selected <- df$id
+
+            freekicks_filtered <- freekicks %>%
+                filter(id == id_selected)
             
-            con <- DBI::dbConnect(RSQLite::SQLite(), dbname = "data/free_kicks_messi.sqlite")
-            
-            freeze_frame <- tbl(con, "freeze_frames") %>%
-                filter(id == id_selected) %>%
-                collect()
-            
-            DBI::dbDisconnect(con)
+            freeze_frame <- freekicks_filtered$freeze_frame[[1]] %>%
+                rowwise() %>%
+                mutate(freeze_x = location[[1]],
+                       freeze_y = location[[2]],
+                       teammate = ifelse(teammate, 0, 1)) %>%
+                select(teammate, player.name, freeze_x, freeze_y)
             
             free_kick_location <- map_df(list(teammate = 2, 
-                                              player.id = 999, 
                                               player.name = "Free Kick Location",
-                                              position.id = 999,
-                                              position.name = "Free Kick Location",
-                                              id = id_selected,
                                               freeze_x = df$location_x,
                                               freeze_y = df$location_y), ~.x)
             
@@ -194,7 +211,7 @@ server <- function(input, output) {
     
     output$eventTable <- renderDT({
         
-        not_visible <- c(11:19)
+        not_visible <- c(11:20)
         datatable(sd, 
                   rownames = FALSE, 
                   options = list(
